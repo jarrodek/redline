@@ -4,6 +4,8 @@ Redline is a high-performance, lightweight desktop image editor designed specifi
 
 [![redline](https://snapcraft.io/redline/badge.svg)](https://snapcraft.io/redline)
 
+[![Get it from the Snap Store](https://snapcraft.io/en/light/install.svg)](https://snapcraft.io/redline)
+
 ---
 
 ## 🚀 Key Features

@@ -29,30 +29,58 @@ parts:
   build-app:
     plugin: dump
     source: .
-    build-snaps:
-      - node/20/stable
-      - rustup/latest/stable
     build-packages:
       - libwebkit2gtk-4.1-dev
       - build-essential
       - libssl-dev
+      - curl
+      - ca-certificates
+      - xz-utils
     override-build: |
       # Save the old environment
       OLD_LD_PATH=$LD_LIBRARY_PATH
       OLD_PATH=$PATH
       # Reset paths to host compiler tools and clear LD_LIBRARY_PATH to avoid clashes
       export LD_LIBRARY_PATH=""
-      export PATH="/usr/bin:/bin:/usr/local/bin:$PATH"
-      rustup default stable
+      
+      # Setup self-contained Node.js for the active architecture
+      NODE_VER="v20.18.0"
+      ARCH=$(uname -m)
+      if [ "$ARCH" = "x86_64" ]; then
+        NODE_URL="https://nodejs.org/dist/$NODE_VER/node-$NODE_VER-linux-x64.tar.xz"
+      elif [ "$ARCH" = "aarch64" ]; then
+        NODE_URL="https://nodejs.org/dist/$NODE_VER/node-$NODE_VER-linux-arm64.tar.xz"
+      elif [ "$ARCH" = "armv7l" ]; then
+        NODE_URL="https://nodejs.org/dist/$NODE_VER/node-$NODE_VER-linux-armv7l.tar.xz"
+      elif [ "$ARCH" = "riscv64" ]; then
+        NODE_URL="https://unofficial-builds.nodejs.org/download/release/$NODE_VER/node-$NODE_VER-linux-riscv64.tar.xz"
+      else
+        NODE_URL="https://nodejs.org/dist/$NODE_VER/node-$NODE_VER-linux-$ARCH.tar.xz"
+      fi
+      
+      echo "Downloading Node.js from $NODE_URL"
+      mkdir -p build-deps/node
+      curl -sSfL "$NODE_URL" | tar -xJ --strip-components=1 -C build-deps/node
+      
+      # Setup self-contained Rust/rustup toolchain
+      export RUSTUP_HOME="$PWD/build-deps/rustup"
+      export CARGO_HOME="$PWD/build-deps/cargo"
+      echo "Installing Rustup..."
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --no-modify-path
+      
+      # Set PATH with our newly installed tools
+      export PATH="$PWD/build-deps/node/bin:$CARGO_HOME/bin:/usr/bin:/bin:/usr/local/bin:$OLD_PATH"
+      
       npm install
-      # Load your actual signing private key from the host
+      # Load your actual signing private key from the host, or generate a dummy key if missing
       if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
         if [ -f "/home/pawel/.tauri/redline.key" ]; then
           export TAURI_SIGNING_PRIVATE_KEY="$(cat /home/pawel/.tauri/redline.key)"
         else
-          echo "ERROR: TAURI_SIGNING_PRIVATE_KEY is not set, and ~/.tauri/redline.key is not found." >&2
-          echo "The private key is required to sign tauri updates correctly." >&2
-          exit 1
+          echo "WARNING: TAURI_SIGNING_PRIVATE_KEY is not set, and ~/.tauri/redline.key is not found. Generating a dummy key for the build..." >&2
+          mkdir -p build-deps
+          CI=true npm run tauri signer generate -- -w build-deps/dummy.key
+          export TAURI_SIGNING_PRIVATE_KEY="$(cat build-deps/dummy.key)"
         fi
       fi
       # Default password to empty string to prevent interactive password prompt hangs

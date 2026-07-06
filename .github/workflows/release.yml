@@ -21,7 +21,7 @@ jobs:
 
       - name: Create Release
         id: create_release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -90,38 +90,3 @@ jobs:
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
-
-      - name: Build Snap Package (Linux only)
-        if: matrix.platform == 'ubuntu-22.04'
-        id: build_snap
-        run: |
-          # Wait for snapd to finish seeding to avoid installation conflicts
-          sudo snap wait system seed.loaded
-          # Pre-install gtk-common-themes to avoid transient snapcraft install failures
-          for i in {1..3}; do sudo snap install gtk-common-themes && break || sleep 5; done
-          sudo snap install snapcraft --classic
-          # Build the snap directly on the runner (uses GLIBC 2.35 matching core22)
-          snapcraft pack --destructive-mode || (cat /home/runner/.local/state/snapcraft/log/*.log && exit 1)
-          # Expose the built snap file name for subsequent steps
-          SNAP_FILE=$(ls redline_*.snap | head -n 1)
-          echo "snap_path=$SNAP_FILE" >> $GITHUB_OUTPUT
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-
-      - name: Upload Snap to Release (Linux only)
-        if: matrix.platform == 'ubuntu-22.04'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: ${{ steps.build_snap.outputs.snap_path }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish to Snap Store (Linux only)
-        if: matrix.platform == 'ubuntu-22.04'
-        uses: snapcore/action-publish@v1
-        env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
-        with:
-          snap: ${{ steps.build_snap.outputs.snap_path }}
-          release: stable

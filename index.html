@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Redline - Desktop Image Editor</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/main.ts" defer></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div class="app-layout">
+      <!-- Main Editor Area -->
+      <main class="editor-area">
+        <!-- Canvas Viewport with grid backdrop -->
+        <div class="canvas-viewport" id="canvas-viewport">
+          <!-- Centered dropzone overlay for empty canvas -->
+          <div class="empty-state" id="empty-state">
+            <div class="empty-card">
+              <svg viewBox="0 0 24 24" width="48" height="48" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" class="empty-icon"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+              <h2>No Image Loaded</h2>
+              <p>Paste a screenshot (Ctrl+V), drag and drop an image, or click to open.</p>
+              <button class="action-btn primary" id="btn-empty-open">Open Image</button>
+            </div>
+          </div>
+
+          <!-- Canvas container wrapper -->
+          <div class="canvas-wrapper hidden" id="canvas-wrapper">
+            <!-- Layers -->
+            <canvas id="base-canvas"></canvas>
+            <canvas id="annotation-canvas"></canvas>
+          </div>
+        </div>
+
+        <!-- Footer / Status Bar -->
+        <footer class="status-bar">
+          <div class="status-left">
+            <span id="status-size" class="status-item">0 x 0 px</span>
+            <span id="status-coords" class="status-item">x: 0, y: 0</span>
+            <span id="status-selection" class="status-item hidden">1 shape selected</span>
+          </div>
+
+          <div class="status-right">
+            <!-- Panning Help Indicator -->
+            <span class="status-item hint">Hold Space + Drag to Pan</span>
+            <!-- Zoom Controls -->
+            <div class="zoom-controls">
+              <button class="zoom-btn" id="btn-zoom-out" title="Zoom Out">
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              </button>
+              <span id="zoom-percent" class="status-item">100%</span>
+              <button class="zoom-btn" id="btn-zoom-in" title="Zoom In">
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              </button>
+              <button class="zoom-btn text" id="btn-zoom-fit" title="Fit to Screen">Fit</button>
+            </div>
+          </div>
+        </footer>
+      </main>
+
+      <!-- Sidebar Control Panel -->
+      <aside class="sidebar">
+
+
+        <!-- Tab Controls -->
+        <div class="tab-headers">
+          <button class="tab-btn active" data-tab="draw">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+            Draw
+          </button>
+          <button class="tab-btn" data-tab="crop">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M6.13 1L6 16a2 2 0 0 0 2 2h15"></path><path d="M1 6.13L16 6a2 2 0 0 1 2 2v15"></path></svg>
+            Crop
+          </button>
+          <button class="tab-btn" data-tab="edit">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"></path><path d="M4 16v4h4"></path><path d="M20 4L14 10"></path><path d="M4 20l6-6"></path><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="M20 12h2"></path><path d="M2 12h2"></path></svg>
+            Transform
+          </button>
+          <button class="tab-btn" data-tab="file">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            File
+          </button>
+        </div>
+
+        <div class="tab-content-wrapper">
+          <!-- Drawing Tab Panel -->
+          <div class="tab-pane active" id="tab-draw">
+            <!-- Tool Selection Grid -->
+            <div class="section-title">Tools</div>
+            <div class="tools-grid">
+              <button class="tool-btn active" data-tool="select" title="Select and Move (V)">
+                <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 3 10.07 19.97 12.58 12.58 19.97 10.07 3 3"></polygon><line x1="13" y1="13" x2="19" y2="19"></line></svg>
+                <span>Select</span>
+              </button>
+              <button class="tool-btn" data-tool="rect" title="Rectangle (R)">
+                <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                <span>Rectangle</span>
+              </button>
+
+              <button class="tool-btn" data-tool="circle" title="Circle (O)">
+                <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>
+                <span>Circle</span>
+              </button>
+              <button class="tool-btn" data-tool="text" title="Text (T)">
+                <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
+                <span>Text</span>
+              </button>
+            </div>
+
+            <!-- Context Styles Panel -->
+            <div id="draw-style-section">
+              <div class="section-title">Style Settings</div>
+              
+              <!-- Stroke/Fill Color -->
+              <div class="control-group">
+                <label>Color</label>
+                <div class="color-picker-row">
+                  <input type="color" id="primary-color" value="#ef4444">
+                  <div class="preset-colors">
+                    <button class="preset-color-btn active" style="background-color: #ef4444;" data-color="#ef4444"></button>
+                    <button class="preset-color-btn" style="background-color: #10b981;" data-color="#10b981"></button>
+                    <button class="preset-color-btn" style="background-color: #3b82f6;" data-color="#3b82f6"></button>
+                    <button class="preset-color-btn" style="background-color: #eab308;" data-color="#eab308"></button>
+                    <button class="preset-color-btn" style="background-color: #a855f7;" data-color="#a855f7"></button>
+                    <button class="preset-color-btn" style="background-color: #ffffff;" data-color="#ffffff"></button>
+                    <button class="preset-color-btn" style="background-color: #000000;" data-color="#000000"></button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Stroke Thickness (for shapes) -->
+              <div class="control-group" id="group-stroke-width">
+                <label for="stroke-width">Border Width: <span id="stroke-width-val">4px</span></label>
+                <input type="range" id="stroke-width" min="1" max="20" value="4">
+              </div>
+
+              <!-- Fill Option (for shapes) -->
+              <div class="control-group-row" id="group-fill">
+                <label for="fill-shape">Fill Shape</label>
+                <label class="switch">
+                  <input type="checkbox" id="fill-shape">
+                  <span class="slider round"></span>
+                </label>
+              </div>
+
+              <!-- Rectangle Corner Radius -->
+              <div class="control-group hidden" id="group-corner-radius">
+                <label for="corner-radius">Corner Radius: <span id="corner-radius-val">0px</span></label>
+                <input type="range" id="corner-radius" min="0" max="50" value="0">
+              </div>
+
+              <!-- Shape Opacity -->
+              <div class="control-group" id="group-shape-opacity">
+                <label for="shape-opacity">Opacity: <span id="shape-opacity-val">100%</span></label>
+                <input type="range" id="shape-opacity" min="10" max="100" value="100">
+              </div>
+
+              <!-- Text Font Size -->
+              <div class="control-group hidden" id="group-font-size">
+                <label for="font-size">Text Size: <span id="font-size-val">24px</span></label>
+                <input type="range" id="font-size" min="12" max="72" value="24">
+              </div>
+              
+              <!-- Text Font Weight -->
+              <div class="control-group-row hidden" id="group-font-bold">
+                <label for="font-bold">Bold Text</label>
+                <label class="switch">
+                  <input type="checkbox" id="font-bold">
+                  <span class="slider round"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Crop Tab Panel -->
+          <div class="tab-pane" id="tab-crop">
+            <div class="section-title">Aspect Ratio</div>
+            <div class="aspect-ratio-grid">
+              <button class="aspect-btn active" data-ratio="free">
+                <div class="ratio-icon-circle">
+                  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 3H3v2m0 4h2m4-4V3m4 0h2m4 0h2v2m0 4h-2m2 4v2m0 4h-2v2m-4 0v-2m-4 2v-2m-4 2H3v-2m0-4h2"></path>
+                  </svg>
+                </div>
+                <span>Free</span>
+              </button>
+              <button class="aspect-btn" data-ratio="original">
+                <div class="ratio-icon-circle">
+                  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+                    <circle cx="7" cy="15" r="1"></circle>
+                    <circle cx="12" cy="15" r="1"></circle>
+                    <circle cx="17" cy="15" r="1"></circle>
+                  </svg>
+                </div>
+                <span>Original</span>
+              </button>
+              <button class="aspect-btn" data-ratio="16-9">
+                <div class="ratio-icon-circle">
+                  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+                    <rect x="2" y="6" width="20" height="12" rx="1.5"></rect>
+                  </svg>
+                </div>
+                <span>16:9</span>
+              </button>
+              <button class="aspect-btn" data-ratio="9-16">
+                <div class="ratio-icon-circle">
+                  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+                    <rect x="6" y="2" width="12" height="20" rx="1.5"></rect>
+                  </svg>
+                </div>
+                <span>9:16</span>
+              </button>
+              <button class="aspect-btn" data-ratio="5-4">
+                <div class="ratio-icon-circle">
+                  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+                    <rect x="3" y="5" width="18" height="14.4" rx="1.5"></rect>
+                  </svg>
+                </div>
+                <span>5:4</span>
+              </button>
+              <button class="aspect-btn" data-ratio="4-5">
+                <div class="ratio-icon-circle">
+                  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+                    <rect x="5" y="3" width="14.4" height="18" rx="1.5"></rect>
+                  </svg>
+                </div>
+                <span>4:5</span>
+              </button>
+              <button class="aspect-btn" data-ratio="4-3">
+                <div class="ratio-icon-circle">
+                  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+                    <rect x="3" y="5.25" width="18" height="13.5" rx="1.5"></rect>
+                  </svg>
+                </div>
+                <span>4:3</span>
+              </button>
+              <button class="aspect-btn" data-ratio="3-4">
+                <div class="ratio-icon-circle">
+                  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+                    <rect x="5.25" y="3" width="13.5" height="18" rx="1.5"></rect>
+                  </svg>
+                </div>
+                <span>3:4</span>
+              </button>
+              <button class="aspect-btn" data-ratio="3-2">
+                <div class="ratio-icon-circle">
+                  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+                    <rect x="3" y="6" width="18" height="12" rx="1.5"></rect>
+                  </svg>
+                </div>
+                <span>3:2</span>
+              </button>
+              <button class="aspect-btn" data-ratio="2-3">
+                <div class="ratio-icon-circle">
+                  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+                    <rect x="6" y="3" width="12" height="18" rx="1.5"></rect>
+                  </svg>
+                </div>
+                <span>2:3</span>
+              </button>
+              <button class="aspect-btn" data-ratio="square">
+                <div class="ratio-icon-circle">
+                  <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+                    <rect x="4" y="4" width="16" height="16" rx="1.5"></rect>
+                  </svg>
+                </div>
+                <span>Square</span>
+              </button>
+            </div>
+
+            <div class="crop-actions-group">
+              <button class="action-btn success" id="btn-crop-apply">Apply Crop</button>
+              <button class="action-btn danger" id="btn-crop-cancel">Cancel</button>
+            </div>
+          </div>
+
+          <!-- Transform Tab Panel -->
+          <div class="tab-pane" id="tab-edit">
+
+            <div class="section-title" style="margin-top: 24px;">Resize Image</div>
+            <div class="resize-box">
+              <div class="control-group-row">
+                <div class="input-subgroup">
+                  <label for="resize-width">Width (px)</label>
+                  <input type="number" id="resize-width" min="1" placeholder="Width">
+                </div>
+                <div class="resize-chain">
+                  <button id="btn-lock-aspect" class="active" title="Lock Aspect Ratio">
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                  </button>
+                </div>
+                <div class="input-subgroup">
+                  <label for="resize-height">Height (px)</label>
+                  <input type="number" id="resize-height" min="1" placeholder="Height">
+                </div>
+              </div>
+              <button class="action-btn primary" id="btn-resize-apply" style="margin-top: 12px; width: 100%;">
+                Resize Canvas
+              </button>
+            </div>
+          </div>
+
+          <!-- File Tab Panel -->
+          <div class="tab-pane" id="tab-file">
+            <div class="section-title">Open & Import</div>
+            <div class="action-list">
+              <button class="action-btn primary" id="btn-open-file">
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                Open Image File...
+              </button>
+              <div class="dropzone-mini" id="sidebar-dropzone">
+                <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 8px; opacity: 0.5;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <span>Drag & Drop image here</span>
+              </div>
+            </div>
+
+            <div class="section-title" style="margin-top: 24px;">Export</div>
+            <div class="action-list">
+              <button class="action-btn success" id="btn-save-file">
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                Save Image As...
+              </button>
+              <button class="action-btn secondary" id="btn-copy-clipboard">
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                Copy to Clipboard
+              </button>
+            </div>
+
+            <div class="section-title" style="margin-top: 24px;">History</div>
+            <div class="btn-group">
+              <button class="action-btn" id="btn-undo" title="Undo (Ctrl+Z)" disabled>
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
+                Undo
+              </button>
+              <button class="action-btn" id="btn-redo" title="Redo (Ctrl+Y)" disabled>
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path></svg>
+                Redo
+              </button>
+            </div>
+            
+            <button class="action-btn danger" id="btn-clear" style="margin-top: 12px; width: 100%;">
+              <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              Clear Canvas
+            </button>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Hidden native file input -->
+    <input type="file" id="file-input" accept="image/*" class="hidden" />
+  </body>
+</html>

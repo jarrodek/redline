@@ -1,0 +1,37 @@
+name: redline
+base: core22
+version: '0.1.0'
+summary: A high-performance, lightweight image annotation & redlining tool.
+description: |
+  Redline is a native, ultra-lightweight desktop image annotation utility
+  designed for designers, developers, and QA reviewers to mark up screenshots,
+  draw dimensions, add highlights, and edit text shapes.
+grade: stable
+confinement: strict
+
+layout:
+  /usr/lib/$SNAPCRAFT_ARCH_TRIPLET/webkit2gtk-4.1:
+    bind: $SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/webkit2gtk-4.1
+
+apps:
+  redline:
+    command: usr/bin/redline
+    desktop: usr/share/applications/redline.desktop
+    extensions: [gnome]
+
+parts:
+  build-app:
+    plugin: dump
+    source: .
+    build-snaps:
+      - node/20/stable
+      - rustup/latest/stable
+    build-packages:
+      - libwebkit2gtk-4.1-dev
+      - build-essential
+      - libssl-dev
+    override-build: |
+      rustup default stable
+      npm install
+      npm run tauri build
+      dpkg -x src-tauri/target/release/bundle/deb/*.deb $SNAPCRAFT_PART_INSTALL/

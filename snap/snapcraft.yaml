@@ -1,6 +1,7 @@
 name: redline
 base: core22
 version: '0.1.0'
+title: Redline
 summary: A high-performance, lightweight image annotation & redlining tool.
 description: |
   Redline is a native, ultra-lightweight desktop image annotation utility
@@ -8,6 +9,11 @@ description: |
   draw dimensions, add highlights, and edit text shapes.
 grade: stable
 confinement: strict
+license: MIT
+contact: https://github.com/jarrodek/redline/issues
+issues: https://github.com/jarrodek/redline/issues
+source-code: https://github.com/jarrodek/redline
+website: https://github.com/jarrodek/redline
 
 layout:
   /usr/lib/$SNAPCRAFT_ARCH_TRIPLET/webkit2gtk-4.1:
@@ -16,7 +22,7 @@ layout:
 apps:
   redline:
     command: usr/bin/redline
-    desktop: usr/share/applications/redline.desktop
+    desktop: usr/share/applications/Redline.desktop
     extensions: [gnome]
 
 parts:
@@ -31,7 +37,35 @@ parts:
       - build-essential
       - libssl-dev
     override-build: |
+      # Save the old environment
+      OLD_LD_PATH=$LD_LIBRARY_PATH
+      OLD_PATH=$PATH
+      # Reset paths to host compiler tools and clear LD_LIBRARY_PATH to avoid clashes
+      export LD_LIBRARY_PATH=""
+      export PATH="/usr/bin:/bin:/usr/local/bin:$PATH"
       rustup default stable
       npm install
-      npm run tauri build
+      # Load your actual signing private key from the host
+      if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+        if [ -f "/home/pawel/.tauri/redline.key" ]; then
+          export TAURI_SIGNING_PRIVATE_KEY="$(cat /home/pawel/.tauri/redline.key)"
+        else
+          echo "ERROR: TAURI_SIGNING_PRIVATE_KEY is not set, and ~/.tauri/redline.key is not found." >&2
+          echo "The private key is required to sign tauri updates correctly." >&2
+          exit 1
+        fi
+      fi
+      # Default password to empty string to prevent interactive password prompt hangs
+      if [ -z "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" ]; then
+        export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
+      fi
+      # Clean any old bundle artifacts to avoid glob issues during extraction
+      rm -rf src-tauri/target/release/bundle/deb
+      npm run tauri build -- --bundles deb
+      # Restore paths
+      export PATH=$OLD_PATH
+      export LD_LIBRARY_PATH=$OLD_LD_PATH
       dpkg -x src-tauri/target/release/bundle/deb/*.deb $SNAPCRAFT_PART_INSTALL/
+      # Copy icon to snap meta folder so snapcraft linter and desktop launcher find it
+      mkdir -p $SNAPCRAFT_PART_INSTALL/meta/gui
+      cp src-tauri/icons/icon.png $SNAPCRAFT_PART_INSTALL/meta/gui/redline.png

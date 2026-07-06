@@ -1,8 +1,8 @@
 # Redline — Lightweight Image Annotation Tool
 
-Redline is a high-performance, lightweight desktop image editor designed specifically for creating documentation screenshots, UI mockups, and quick image markups. 
+Redline is a high-performance, lightweight desktop image editor designed specifically for creating documentation screenshots, UI mockups, and quick image markups.
 
-Unlike heavy Electron-based applications, Redline compiles down to a native package of **under 5 MB** (typically ~4.4 MB on Ubuntu) and runs with a minimal memory footprint. It utilizes **Tauri v2** to load a fast, secure WebKit webview, with application logic written in HTML5, CSS3, and Vanilla TypeScript.
+[![redline](https://snapcraft.io/redline/badge.svg)](https://snapcraft.io/redline)
 
 ---
 
@@ -14,9 +14,8 @@ Unlike heavy Electron-based applications, Redline compiles down to a native pack
 *   **Drag & Drop:** Drop any image file directly onto the canvas to open it.
 *   **Annotation Tools:**
     *   **Select Tool:** Grab, move, and drag corners to scale shapes or text.
-    *   **Rectangle / Rounded Rectangle:** Draw bounding boxes with border thickness sliders and fill options.
-    *   **Circle:** Focus circles for UI components.
-    *   **Highlight Marker:** Semi-transparent highlighter using the canvas `multiply` blend mode to keep text and UI elements underneath perfectly visible and dark (rather than washed out).
+    *   **Rectangle:** Draw bounding boxes with border thickness sliders and fill options.
+    *   **Circle:** Focus circles for UI components.perfectly visible and dark (rather than washed out).
     *   **Text Tool:** Click to create a text block with adjustable size and bold formatting.
 *   **Canvas Transforms:**
     *   **Crop Mode:** Resizable crop frame; existing annotations automatically adjust relative to the cropped top-left corner.

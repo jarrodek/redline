@@ -79,3 +79,34 @@ jobs:
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
+
+      - name: Build Snap Package (Linux only)
+        if: matrix.platform == 'ubuntu-22.04'
+        id: build_snap
+        run: |
+          sudo snap install snapcraft --classic
+          # Build the snap directly on the runner (uses GLIBC 2.35 matching core22)
+          snapcraft pack --destructive-mode
+          # Expose the built snap file name for subsequent steps
+          SNAP_FILE=$(ls redline_*.snap | head -n 1)
+          echo "snap_path=$SNAP_FILE" >> $GITHUB_OUTPUT
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+
+      - name: Upload Snap to Release (Linux only)
+        if: matrix.platform == 'ubuntu-22.04'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: ${{ steps.build_snap.outputs.snap_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to Snap Store (Linux only)
+        if: matrix.platform == 'ubuntu-22.04'
+        uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        with:
+          snap: ${{ steps.build_snap.outputs.snap_path }}
+          release: stable

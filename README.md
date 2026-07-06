@@ -103,3 +103,12 @@ Once completed, Tauri will output the native builds to the bundle directory:
 sudo dpkg -i src-tauri/target/release/bundle/deb/redline_0.1.0_amd64.deb
 sudo apt-get install -f # Fixes any missing dependencies
 ```
+
+--
+
+## Bumping version
+
+- package.json
+- src-tauri/tauri.conf.json
+- src-tauri/Cargo.toml
+- snap/snapcraft.yaml

@@ -573,13 +573,15 @@ input:checked + .slider:before {
 
 .canvas-wrapper {
   position: relative;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 10px 10px -5px rgba(0, 0, 0, 0.5);
   border-radius: 4px;
   overflow: visible;
 }
 
 canvas {
   display: block;
+  /* Force canvases onto their own GPU compositing layers to accelerate texture uploads */
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 #base-canvas {

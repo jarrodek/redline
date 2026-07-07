@@ -147,6 +147,16 @@ export class Annotator {
    */
   public activePreviewShape: Shape | null = null
 
+  /**
+   * Caches the data URL of the current base image to avoid calling toDataURL() repeatedly on history state save.
+   */
+  private currentBaseImageSrc: string | null = null
+
+  /**
+   * Caches the bounding client rect of the annotation canvas to avoid layout thrashing on mousemove.
+   */
+  private annCanvasRect: DOMRect | null = null
+
   // Panning states
   /**
    * Flag indicating whether the spacebar is pressed, enabling canvas panning.
@@ -235,6 +245,13 @@ export class Annotator {
     this.setupAspectButtons()
     this.setupMenuActions()
     void this.checkForUpdates()
+
+    window.addEventListener('resize', () => {
+      this.annCanvasRect = null
+    })
+    this.viewport.addEventListener('scroll', () => {
+      this.annCanvasRect = null
+    })
   }
 
   /**
@@ -306,8 +323,12 @@ export class Annotator {
 
   // Save state to Undo history
   public saveHistoryState(): void {
+    if (!this.currentBaseImageSrc) {
+      this.currentBaseImageSrc = this.baseCanvas.toDataURL('image/png')
+    }
+
     const state: HistoryState = {
-      baseImageSrc: this.baseCanvas.toDataURL('image/png'),
+      baseImageSrc: this.currentBaseImageSrc,
       annotations: JSON.stringify(this.annotations.map((s) => s.toJSON())),
       imageWidth: this.baseCanvas.width,
       imageHeight: this.baseCanvas.height,
@@ -334,10 +355,13 @@ export class Annotator {
         this.baseCanvas.height = state.imageHeight
         this.annCanvas.width = state.imageWidth
         this.annCanvas.height = state.imageHeight
+        this.baseCtx.drawImage(this.baseImage, 0, 0)
         resolve()
       }
       this.baseImage.src = state.baseImageSrc
     })
+
+    this.currentBaseImageSrc = state.baseImageSrc
 
     const rawAnnotations: AnnotationShape[] = JSON.parse(state.annotations)
     this.annotations = rawAnnotations.map((json) => ShapeFactory.fromJSON(json))
@@ -1026,6 +1050,7 @@ export class Annotator {
     this.baseCtx.drawImage(tempCanvas, 0, 0)
     this.imageAspectRatio = newW / newH
 
+    this.currentBaseImageSrc = tempCanvas.toDataURL('image/png')
     this.saveHistoryState()
     this.updateCanvasStyles()
     this.draw()
@@ -1037,6 +1062,7 @@ export class Annotator {
     reader.onload = (e) => {
       const src = e.target?.result as string
 
+      this.currentBaseImageSrc = src
       this.baseImage = new Image()
       this.baseImage.onload = () => {
         this.baseCanvas.width = this.baseImage.width
@@ -1101,6 +1127,7 @@ export class Annotator {
     this.annCanvas.style.height = h + 'px'
 
     this.statusSize.textContent = `${this.baseCanvas.width} x ${this.baseCanvas.height} px`
+    this.annCanvasRect = null
   }
 
   private fitToScreen(): void {
@@ -1128,10 +1155,6 @@ export class Annotator {
   // Master Draw Canvas Function
   public draw(): void {
     if (this.baseCanvas.width === 0) return
-
-    // Base canvas holds base image
-    this.baseCtx.clearRect(0, 0, this.baseCanvas.width, this.baseCanvas.height)
-    this.baseCtx.drawImage(this.baseImage, 0, 0)
 
     // Clear Annotation context
     this.annCtx.clearRect(0, 0, this.annCanvas.width, this.annCanvas.height)
@@ -1251,7 +1274,10 @@ export class Annotator {
 
   // Get canvas pixel coordinates from screen mouse event
   private getCanvasCoords(e: MouseEvent): { x: number; y: number } {
-    const rect = this.annCanvas.getBoundingClientRect()
+    if (!this.annCanvasRect) {
+      this.annCanvasRect = this.annCanvas.getBoundingClientRect()
+    }
+    const rect = this.annCanvasRect
     const x = (e.clientX - rect.left) * (this.annCanvas.width / rect.width)
     const y = (e.clientY - rect.top) * (this.annCanvas.height / rect.height)
     return { x: Math.round(x), y: Math.round(y) }
@@ -1270,7 +1296,12 @@ export class Annotator {
 
   // Mouse Canvas interaction loop
   private setupCanvasInteractions(): void {
+    let mouseMovePending = false
+    let lastMouseMoveEvent: MouseEvent | null = null
+
     this.viewport.addEventListener('mousedown', (e: MouseEvent) => {
+      this.annCanvasRect = null
+
       // 1. Panning Space+Drag
       if (this.isSpacePressed) {
         this.isPanning = true
@@ -1324,34 +1355,16 @@ export class Annotator {
         return
       }
 
-      if (this.baseCanvas.width === 0) return
-
-      const { x, y } = this.getCanvasCoords(e)
-      this.statusCoords.textContent = `x: ${x}, y: ${y}`
-
-      // 2. Crop drag movement or hover cursor update
-      if (this.cropManager.isCropMode && this.cropManager.cropRect) {
-        const isOverCanvas = x >= 0 && x <= this.baseCanvas.width && y >= 0 && y <= this.baseCanvas.height
-        if (this.cropManager.cropDragHandle) {
-          this.updateCropCursor(this.cropManager.cropDragHandle, isOverCanvas)
-          this.cropManager.updateCropRectCoords(
-            x,
-            y,
-            this.drawStartX,
-            this.drawStartY,
-            this.baseCanvas.width,
-            this.baseCanvas.height
-          )
-          this.draw()
-          return
-        } else {
-          const handle = getHandleAt(x, y, this.cropManager.cropRect, 12)
-          this.updateCropCursor(handle, isOverCanvas)
-        }
+      lastMouseMoveEvent = e
+      if (!mouseMovePending) {
+        mouseMovePending = true
+        requestAnimationFrame(() => {
+          if (lastMouseMoveEvent) {
+            this.handleMouseMoveImmediately(lastMouseMoveEvent)
+          }
+          mouseMovePending = false
+        })
       }
-
-      // 3. Delegate to Tool Manager
-      this.toolManager.handleMouseMove(e, x, y)
     })
 
     this.viewport.addEventListener('mouseup', (e: MouseEvent) => {
@@ -1435,6 +1448,37 @@ export class Annotator {
     // Crop Panel Buttons
     this.uiState.cropApplyButton.addEventListener('click', () => this.applyCrop())
     this.uiState.cropCancelButton.addEventListener('click', () => this.cancelCropMode())
+  }
+
+  private handleMouseMoveImmediately(e: MouseEvent): void {
+    if (this.baseCanvas.width === 0) return
+
+    const { x, y } = this.getCanvasCoords(e)
+    this.statusCoords.textContent = `x: ${x}, y: ${y}`
+
+    // 2. Crop drag movement or hover cursor update
+    if (this.cropManager.isCropMode && this.cropManager.cropRect) {
+      const isOverCanvas = x >= 0 && x <= this.baseCanvas.width && y >= 0 && y <= this.baseCanvas.height
+      if (this.cropManager.cropDragHandle) {
+        this.updateCropCursor(this.cropManager.cropDragHandle, isOverCanvas)
+        this.cropManager.updateCropRectCoords(
+          x,
+          y,
+          this.drawStartX,
+          this.drawStartY,
+          this.baseCanvas.width,
+          this.baseCanvas.height
+        )
+        this.draw()
+        return
+      } else {
+        const handle = getHandleAt(x, y, this.cropManager.cropRect, 12)
+        this.updateCropCursor(handle, isOverCanvas)
+      }
+    }
+
+    // 3. Delegate to Tool Manager
+    this.toolManager.handleMouseMove(e, x, y)
   }
 
   // ContentEditable Floating Text Box Editor
@@ -1625,7 +1669,9 @@ export class Annotator {
 
       this.switchToTab('draw')
     }
-    this.baseImage.src = tempCanvas.toDataURL('image/png')
+    const cropSrc = tempCanvas.toDataURL('image/png')
+    this.currentBaseImageSrc = cropSrc
+    this.baseImage.src = cropSrc
   }
 
   public setCropRatio(ratioType: string, btn: HTMLButtonElement): void {

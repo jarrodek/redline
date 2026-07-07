@@ -46,6 +46,7 @@ parts:
       - ca-certificates
       - xz-utils
     override-build: |
+      rustup default stable
       npm install
       # Clean any old bundle artifacts to avoid glob issues during extraction
       rm -rf src-tauri/target/release/bundle/deb

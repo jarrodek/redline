@@ -1,6 +1,6 @@
 [package]
 name = "redline"
-version = "0.1.2"
+version = "0.1.3"
 description = "Lightweight image annotation and screenshot markup tool"
 authors = ["Pawel Uchida-Psztyc"]
 edition = "2021"

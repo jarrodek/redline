@@ -1,6 +1,6 @@
 name: redline
 base: core22
-version: '0.1.2'
+version: '0.1.3'
 title: Redline
 summary: A high-performance, lightweight image annotation & redlining tool.
 description: |
